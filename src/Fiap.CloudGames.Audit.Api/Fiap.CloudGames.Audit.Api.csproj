@@ -1,0 +1,25 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <RootNamespace>Fiap.CloudGames.Audit.Api</RootNamespace>
+    <UserSecretsId>dotnet-Fiap.CloudGames.Audit.Api-9c2f1d8b-a3b1-4a17-9c01-bc1f4d6b5e02</UserSecretsId>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="AspNetCore.HealthChecks.UI.Client" Version="9.0.0" />
+    <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="10.0.1" />
+    <PackageReference Include="Serilog.AspNetCore" Version="10.0.0" />
+    <PackageReference Include="Serilog.Sinks.Grafana.Loki" Version="8.3.2" />
+    <PackageReference Include="Swashbuckle.AspNetCore" Version="6.8.1" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Fiap.CloudGames.Audit.Application\Fiap.CloudGames.Audit.Application.csproj" />
+    <ProjectReference Include="..\Fiap.CloudGames.Audit.Domain\Fiap.CloudGames.Audit.Domain.csproj" />
+    <ProjectReference Include="..\Fiap.CloudGames.Audit.Infrastructure\Fiap.CloudGames.Audit.Infrastructure.csproj" />
+  </ItemGroup>
+
+</Project>

@@ -1,0 +1,17 @@
+bin/
+obj/
+*.user
+*.suo
+.vs/
+.vscode/
+.idea/
+.env
+*.local.json
+TestResults/
+coverage/
+publish/
+*.log
+.terraform/
+*.tfstate
+*.tfstate.backup
+.terraform.lock.hcl

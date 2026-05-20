@@ -1,0 +1,19 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: audit-config
+  namespace: fcg-apps
+  labels:
+    app: audit-svc
+    part-of: fiap-cloud-games
+data:
+  ASPNETCORE_ENVIRONMENT: "Production"
+  ASPNETCORE_URLS: "http://+:8080"
+  MESSAGING_PROVIDER: "RabbitMQ"
+  Queues__Audit__Events: "audit.events"
+  RabbitMq__HostName: "rabbitmq-service.fcg-infra.svc.cluster.local"
+  Loki__Url: "http://loki-service.fcg-infra.svc.cluster.local:3100"
+  AWS__Region: "us-east-1"
+  DynamoDb__TableName: "cloud-games-audit-events"
+  DynamoDb__Region: "us-east-1"
+  DynamoDb__AutoCreateTable: "true"

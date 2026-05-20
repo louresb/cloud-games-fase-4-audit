@@ -1,0 +1,27 @@
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: audit-sa
+  namespace: fcg-apps
+  labels:
+    app: audit-svc
+  annotations:
+    # When provisioned in EKS, replace with IAM role ARN created by Terraform (IRSA)
+    eks.amazonaws.com/role-arn: ""
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: audit-svc
+  namespace: fcg-apps
+  labels:
+    app: audit-svc
+    part-of: fiap-cloud-games
+spec:
+  type: ClusterIP
+  selector:
+    app: audit-svc
+  ports:
+    - name: http
+      port: 80
+      targetPort: http
