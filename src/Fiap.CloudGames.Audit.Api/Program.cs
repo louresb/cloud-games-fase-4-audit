@@ -1,4 +1,4 @@
-using Fiap.CloudGames.Audit.Api.Middlewares;
+﻿using Fiap.CloudGames.Audit.Api.Middlewares;
 using Fiap.CloudGames.Audit.Application;
 using Fiap.CloudGames.Audit.Infrastructure;
 using HealthChecks.UI.Client;
@@ -33,7 +33,6 @@ builder.Services.AddAuditInfrastructure(builder.Configuration);
 
 builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
-builder.Services.AddSwaggerGen();
 
 builder.Services.AddHealthChecks();
 
@@ -43,11 +42,6 @@ app.UseSerilogRequestLogging();
 app.UseMiddleware<CorrelationIdMiddleware>();
 app.UseMiddleware<TenantMiddleware>();
 
-if (app.Environment.IsDevelopment())
-{
-    app.UseSwagger();
-    app.UseSwaggerUI();
-}
 
 app.MapControllers();
 
@@ -71,3 +65,4 @@ finally
 {
     Log.CloseAndFlush();
 }
+
