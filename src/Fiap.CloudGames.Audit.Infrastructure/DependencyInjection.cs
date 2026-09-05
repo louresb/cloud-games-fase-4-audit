@@ -53,9 +53,7 @@ public static class DependencyInjection
         var auditQueue = configuration["Queues:Audit:Events"] ?? "audit.events";
         var consumerAssembly = typeof(AuditConsumerBase<>).Assembly;
 
-        // MassTransit + RabbitMQ. For AWS deployment, the same MassTransit topology is used —
-        // swap to AmazonSQS transport by switching the package (kept out here to avoid AWSSDK
-        // v3/v4 conflict with DynamoDBv2). See README for the SQS migration note.
+        // MassTransit + RabbitMQ transport used by the current deployment topology.
         services.AddMassTransit(x =>
         {
             x.AddConsumers(consumerAssembly);
