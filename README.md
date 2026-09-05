@@ -1,87 +1,81 @@
-# Fiap Cloud Games — Audit Service (Phase 4)
+# FIAP Cloud Games - Audit Service (Fase 4)
 
-Centralized, append-only audit log of integration events consumed from the other services. Persisted in **Amazon DynamoDB** (single-table design) and queryable via REST API.
+Serviço centralizado de auditoria que consome eventos de integração dos demais domínios e mantém um histórico append-only no Amazon DynamoDB. Os registros podem ser consultados por tenant, tipo de evento ou identificador de correlação.
 
-## Why
+## Objetivos
 
-- Forensic trail for compliance (LGPD).
-- Multi-tenant per `X-Tenant-Id` (FIAP / Alura / PM3).
-- Distributed-tracing companion: query by `CorrelationId` to reconstruct a user journey across services.
+- Manter uma trilha de alterações e eventos relevantes.
+- Isolar os registros por `TenantId`.
+- Permitir a reconstrução de fluxos distribuídos por `CorrelationId`.
+- Preservar o payload original e os metadados de origem.
 
-## Architecture
+## Arquitetura
 
-```
-+---------+   +---------+   +---------+
-| Users   |   | Catalog |   | Payments |
-+---------+   +---------+   +---------+
-     |             |             |
-     +-------------+-------------+
-                   |
-              fanout exchange (RabbitMQ / SNS topic)
-                   |
-            +------v------+
-            | audit-svc   |
-            | (consumer)  |
-            +------+------+
-                   |
-            +------v------+
-            |  DynamoDB   |  cloud-games-audit-events
-            +-------------+
-                   |
-            +------v------+
-            | audit-svc   |
-            | (REST API)  |  GET /api/audit
-            +-------------+
+```text
+Users -------+
+Catalog -----+--> RabbitMQ --> Audit Service --> DynamoDB
+Payments ----+                       |
+                                     +--> REST API
 ```
 
-## DynamoDB table
+O serviço usa RabbitMQ com MassTransit para consumir eventos. No ambiente local, o DynamoDB é executado pelo LocalStack; na AWS, a tabela é provisionada pelo Terraform do repositório de orquestração.
 
-| Attribute | Type | Notes |
-|---|---|---|
-| `TenantId` | PK (HASH) | FIAP / Alura / PM3 / unknown |
-| `SortKey` | SK (RANGE) | `<ISO timestamp>#<id>` — newest first when ScanIndexForward=false |
-| `EventType` | GSI `gsi_event_type` HASH | filter by event |
-| `CorrelationId` | GSI `gsi_correlation` HASH | trace a request across services |
-| `SourceService`, `AggregateId`, `PayloadJson`, `CreatedAt` | attributes | raw event payload + metadata |
+## Tabela DynamoDB
 
-Billing: PAY_PER_REQUEST (on-demand).
+| Atributo | Uso |
+|---|---|
+| `TenantId` | Partition key |
+| `SortKey` | Timestamp ISO + identificador, permitindo ordenação |
+| `EventType` | Partition key do índice `gsi_event_type` |
+| `CorrelationId` | Partition key do índice `gsi_correlation` |
+| `SourceService` | Serviço que originou o evento |
+| `AggregateId` | Entidade relacionada |
+| `PayloadJson` | Payload original |
+| `CreatedAt` | Data de criação |
+
+A tabela usa cobrança sob demanda (`PAY_PER_REQUEST`).
 
 ## Endpoints
 
-| Verb | Path | Use |
+| Método | Endpoint | Uso |
 |---|---|---|
-| GET | `/api/audit?tenantId=FIAP&from=...&to=...&limit=50` | newest-first scan by tenant |
-| GET | `/api/audit/correlation/{correlationId}` | trace a single request |
-| GET | `/api/audit/event/{eventType}` | filter by event name |
-| GET | `/health/live` / `/health/ready` | K8s probes |
-| GET | `/swagger` | OpenAPI UI (dev only) |
+| `GET` | `/api/audit?tenantId=FIAP&from=...&to=...&limit=50` | Consulta eventos recentes por tenant |
+| `GET` | `/api/audit/correlation/{correlationId}` | Reconstrói um fluxo distribuído |
+| `GET` | `/api/audit/event/{eventType}` | Filtra pelo tipo do evento |
+| `GET` | `/health/live` | Liveness probe |
+| `GET` | `/health/ready` | Readiness probe |
 
-## Local dev
+## Execução local
+
+Inicie o LocalStack, o RabbitMQ e o Loki pelo [repositório de orquestração](https://github.com/louresb/cloud-games-fase-4-orchestration-aws):
 
 ```bash
-# 1. start LocalStack (DynamoDB) + RabbitMQ + Loki
 docker compose -f ../cloud-games-fase-4-orchestration-aws/docker-compose.infra.yaml up -d
+```
 
-# 2. run the API
+Depois execute a API:
+
+```bash
 dotnet run --project src/Fiap.CloudGames.Audit.Api
 ```
 
-The service auto-creates the DynamoDB table on first run (`DynamoDb:AutoCreateTable=true`).
+Com `DynamoDb:AutoCreateTable=true`, o serviço cria a tabela local na primeira execução.
 
-## Kubernetes
+## Kubernetes e AWS
 
-```bash
-kubectl apply -f k8s/audit-configmap.yaml
-kubectl apply -f k8s/audit-secret.yaml
-kubectl apply -f k8s/audit-service.yaml
-kubectl apply -f k8s/audit-deployment.yaml
-kubectl apply -f k8s/audit-hpa.yaml
-```
+Os manifests em `k8s/` definem Deployment, Service, ConfigMap, Secret e HPA. O deploy usa rolling update com `maxUnavailable: 0` e `maxSurge: 1`.
 
-Rolling Update is enforced (`maxUnavailable: 0`, `maxSurge: 1`); HPA scales 2–6 pods on CPU/mem.
+Na AWS:
 
-## AWS deployment notes
+- A tabela é definida em `terraform/dynamodb.tf` no repositório de orquestração.
+- O acesso ao DynamoDB usa IAM Roles for Service Accounts (IRSA).
+- Secrets são obtidos do AWS Secrets Manager por External Secrets.
+- A imagem é publicada no Amazon ECR e pode ser implantada no Amazon EKS pelo workflow de deploy.
 
-- DynamoDB table provisioned by Terraform module `terraform/modules/dynamodb` in the orchestration repo. Set `DynamoDb__AutoCreateTable=false` and remove `DynamoDb__ServiceUrl` in production.
-- IAM permissions via IRSA (`eks.amazonaws.com/role-arn` annotation on the `audit-sa` service account). Policy: `dynamodb:PutItem`, `dynamodb:Query` on the table + GSIs.
-- Messaging in AWS uses `MESSAGING_PROVIDER=SQS` + MassTransit AmazonSQS transport.
+## Repositórios relacionados
+
+- [Orquestração](https://github.com/louresb/cloud-games-fase-4-orchestration-aws)
+- [Users](https://github.com/louresb/cloud-games-fase-4-users)
+- [Catalog](https://github.com/louresb/cloud-games-fase-4-catalog)
+- [Payments](https://github.com/louresb/cloud-games-fase-4-payments)
+- [Notifications](https://github.com/louresb/cloud-games-fase-4-notifications)
